@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browser-Based Background Remover</title>
+  
+  <!-- CSS Styles -->
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent-color: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 900px;
+      width: 100%;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 40px 20px;
+      cursor: pointer;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent-color);
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+
+    .drop-zone p {
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .btn {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+    }
+
+    .btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn:disabled {
+      background-color: var(--border-color);
+      cursor: not-allowed;
+    }
+
+    #loader {
+      display: none;
+      margin: 24px 0;
+    }
+
+    .spinner {
+      border: 4px solid var(--border-color);
+      border-top: 4px solid var(--accent-color);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 600px) {
+      .preview-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .image-card {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .image-card h3 {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      width: 100%;
+      text-align: left;
+    }
+
+    .img-wrapper {
+      width: 100%;
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border-radius: 4px;
+      /* Checkerboard background for transparent PNG inspection */
+      background-image: linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+                        linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+                        linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      background-color: #0f172a;
+    }
+
+    .img-wrapper img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .actions {
+      margin-top: 24px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+  </style>
+
+  <!-- Load the background removal engine via ESM CDN -->
+  <script type="module">
+    import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm';
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const loader = document.getElementById('loader');
+    const statusText = document.getElementById('status-text');
+    const previewGrid = document.getElementById('preview-grid');
+    const originalImg = document.getElementById('original-img');
+    const processedImg = document.getElementById('processed-img');
+    const downloadBtn = document.getElementById('download-btn');
+
+    let processedBlobUrl = null;
+
+    // Trigger file selection
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    // Handle Drag and Drop events
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) handleImageSelect(files[0]);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) handleImageSelect(e.target.files[0]);
+    });
+
+    async function handleImageSelect(file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file.');
+        return;
+      }
+
+      // Display original image
+      const originalUrl = URL.createObjectURL(file);
+      originalImg.src = originalUrl;
+
+      // Show loader and hide old previews
+      loader.style.display = 'block';
+      previewGrid.style.display = 'none';
+      downloadBtn.style.display = 'none';
+      statusText.innerText = 'Downloading model & processing image locally...';
+
+      try {
+        // Execute local machine learning background segmentation
+        const blob = await removeBackground(file, {
+        //publicPath: 'https://unpkg.com/@imgly/background-removal@1.5.5/dist/',
+          progress: (key, current, total) => {
+            const percent = Math.round((current / total) * 100);
+            if (!isNaN(percent)) {
+              statusText.innerText = `Processing: ${percent}%`;
+            }
+          }
+        });
+
+        // Clean up previous blob URL if existing
+        if (processedBlobUrl) URL.revokeObjectURL(processedBlobUrl);
+
+        processedBlobUrl = URL.createObjectURL(blob);
+        processedImg.src = processedBlobUrl;
+
+        // Show results
+        previewGrid.style.display = 'grid';
+        downloadBtn.style.display = 'inline-flex';
+      } catch (error) {
+        console.error('Background removal failed:', error);
+        alert('Failed to remove background. See console for details.');
+      } finally {
+        loader.style.display = 'none';
+      }
+    }
+
+    // Download handler
+    downloadBtn.addEventListener('click', () => {
+      if (!processedBlobUrl) return;
+      const a = document.createElement('a');
+      a.href = processedBlobUrl;
+      a.download = 'removed-background.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  </script>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Background Remover</h1>
+    <p class="subtitle">Client-side AI image segmentation powered by WebAssembly</p>
+
+    <!-- Upload Area -->
+    <div class="drop-zone" id="drop-zone">
+      <button class="btn" type="button">Choose Image</button>
+      <p>or drag and drop your image file here</p>
+      <input type="file" id="file-input" accept="image/*">
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loader">
+      <div class="spinner"></div>
+      <p id="status-text">Processing...</p>
+    </div>
+
+    <!-- Image Previews -->
+    <div class="preview-grid" id="preview-grid" style="display: none;">
+      <div class="image-card">
+        <h3>Original</h3>
+        <div class="img-wrapper">
+          <img id="original-img" alt="Original Image">
+        </div>
+      </div>
+      <div class="image-card">
+        <h3>Background Removed</h3>
+        <div class="img-wrapper">
+          <img id="processed-img" alt="Processed Image">
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button id="download-btn" class="btn" style="display: none;">
+        Download PNG
+      </button>
+    </div>
+  </div>
+
+</body>
+</html>
