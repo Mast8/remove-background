@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Browser-Based Background Remover</title>
-
   <link rel="stylesheet" href="style.css">
-
 </head>
 <body>
 
@@ -22,7 +20,7 @@
     </div>
 
     <!-- Loading Indicator -->
-    <div id="loader">
+    <div id="loader" style="display: none;">
       <div class="spinner"></div>
       <p id="status-text">Processing...</p>
     </div>
@@ -36,20 +34,43 @@
         </div>
       </div>
       <div class="image-card">
-        <h3>Background Removed</h3>
-        <div class="img-wrapper">
+        <h3>Processed Output</h3>
+        <div class="img-wrapper" id="processed-wrapper">
           <img id="processed-img" alt="Processed Image">
         </div>
+      </div>
+    </div>
+
+    <!-- Background Controls & Export Options -->
+    <div id="bg-controls" class="controls-panel" style="display: none;">
+      <div class="control-group">
+        <label for="bg-color-picker">Background Color:</label>
+        <input type="color" id="bg-color-picker" value="#000000">
+        
+        <!-- Preset Color Buttons -->
+        <button class="preset-btn" data-color="transparent" title="Transparent">Transparent</button>
+        <button class="preset-btn" data-color="#ffffff" title="White">White</button>
+        <button class="preset-btn" data-color="#000000" title="Black">Black</button>
+        <button class="preset-btn" data-color="#3b82f6" title="Blue">Blue</button>
+      </div>
+
+      <div class="control-group">
+        <label for="format-select">Export Format:</label>
+        <select id="format-select">
+          <option value="image/png">PNG (Supports Transparency)</option>
+          <option value="image/jpeg">JPEG (Solid Background Only)</option>
+        </select>
       </div>
     </div>
 
     <!-- Actions -->
     <div class="actions">
       <button id="download-btn" class="btn" style="display: none;">
-        Download PNG
+        Download Image
       </button>
     </div>
   </div>
+
   <script src="script.js" type="module"></script>
 </body>
 </html>
